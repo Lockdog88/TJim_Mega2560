@@ -10,7 +10,7 @@ int sw1_state, sw2_state, sw3_state;
 
 void setup() {
   //init LCD
-  U8GLIB_ST7920_128X64 u8g(E, RW, RS, U8G_PIN_NONE);
+  U8GLIB_ST7920_128X64 LCD(E, RW, RS, U8G_PIN_NONE);
   
   pinMode(SW1, INPUT); 
   pinMode(SW3, INPUT); 
@@ -22,6 +22,10 @@ void setup() {
   
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);  
+  LCD.setColorIndex(1)
+  LCD.drawLine(85, 0, 85, 63);
+  LCD.drawLine(85, 21, 127, 21);
+  LCD.drawLine(85, 42, 127, 42);
 }
 
 void loop() {
