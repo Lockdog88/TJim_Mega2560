@@ -29,7 +29,7 @@ int psi, tmp, potin, current;
 
 void check_pins_state(void) {
   sw1_state = digitalRead(SW1);
-  if (sw1_state==LOW) {
+  if (sw1_state==HIGH) {
     digitalWrite(K1, HIGH);
     delay(8);
     digitalWrite(K5, HIGH);
@@ -66,7 +66,7 @@ void check_pins_state(void) {
         digitalWrite(K3, HIGH);
         digitalWrite(LED1_B, HIGH); }       
         }
-          if(sw1_state==HIGH) {
+          if(sw1_state==LOW) {
         digitalWrite(K1, LOW);
         digitalWrite(K2, LOW);
         digitalWrite(LED2_G, LOW);
@@ -121,7 +121,6 @@ void digitalPotWrite(int adr, int val) {
 
 void setup() {
   //init LCD
-
   
   pinMode(SW1, INPUT); 
   pinMode(SW3, INPUT); 
@@ -156,7 +155,13 @@ void setup() {
   //LCD.drawLine(85, 42, 127, 42);
 }
 
-  
+  /*
+void loop() {
+  sw3_state = digitalRead(SW3);
+if (sw3_state==LOW) digitalWrite(LED2_G, HIGH);
+if (sw3_state==HIGH) digitalWrite(LED2_G, LOW);
+}  */
+
 void loop() {
   temp_val = analogRead(TEMP);
   potin_val = analogRead(POTIN);
@@ -176,15 +181,13 @@ void loop() {
   check_pins_state();
   //digitalPotWrite(0, potin_val/4);
   //digitalPotWrite(0, 184);
-  if ((potin_val/4)<(72)) {digitalPotWrite(0, potin_val/4);}
-  if ((potin_val/4)>(72)) { 
+  if ((potin_val/4)<(57)) {digitalPotWrite(0, (potin_val/4));}
+  if ((potin_val/4)>(57)) { 
    sw2_state = digitalRead(SW2);
    if (sw2_state == HIGH) {
-     if ((potin_val/4)>72) {digitalPotWrite(0, potin_val/4.65);} else {digitalPotWrite(0, potin_val/4);}
-   } else {
-     if ((potin_val/4)<(72)) {digitalPotWrite(0, potin_val/4);} else {digitalPotWrite(0, 72);}
+     if ((potin_val/4)>57) {digitalPotWrite(0, potin_val/4.65);} else {digitalPotWrite(0, potin_val/4);}
+   } else { digitalPotWrite(0, 57);}
    }
-  }
     
   
   LCD.firstPage();  

@@ -8,7 +8,7 @@
 
 #define SW1      11
 #define SW2      12
-#define SW3      50
+#define SW3      49
 
 #define K1        7
 #define K2        6
