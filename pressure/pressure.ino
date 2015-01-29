@@ -1,6 +1,6 @@
+
 #include "config.h"
 #include "U8glib.h"
-#include "Thermistor.h"
 #include "SPI.h"
 
 #define E  3 //SCK
@@ -20,10 +20,11 @@ char temp_buf[50], potin_buf[50], press_buf[50], curr_buf[50];
 
 bool led_b, led_g;
 
-Thermistor ntc(TEMP);
 U8GLIB_ST7920_128X64 LCD(E, RW, RS, U8G_PIN_NONE);
 
 int psi, tmp, potin, current;
+
+int samples[NUMSAMPLES];
 
 
 
@@ -100,12 +101,6 @@ int potin_result(int val) {
   return temp;
 }
 
-int temp_result(void) {
-  int temp;
-  temp = ntc.getTemp();
-  return temp;
-}
-
 int current_result(int val) {
   int temp;
   temp = val*0.244;
@@ -149,54 +144,93 @@ void setup() {
   pinMode(sCS, OUTPUT);
   SPI.begin(); 
   
-  //LCD.setColorIndex(1);
-  //LCD.drawLine(85, 0, 85, 63);
-  //LCD.drawLine(85, 21, 127, 21);
-  //LCD.drawLine(85, 42, 127, 42);
+
 }
 
-  /*
 void loop() {
-  sw3_state = digitalRead(SW3);
-if (sw3_state==LOW) digitalWrite(LED2_G, HIGH);
-if (sw3_state==HIGH) digitalWrite(LED2_G, LOW);
-}  */
+  uint8_t i;
+  float average;
 
-void loop() {
-  temp_val = analogRead(TEMP);
   potin_val = analogRead(POTIN);
+  delay(100);
   pressure_val = analogRead(PRESSURE);
+  delay(100);
   current_val = analogRead(CURRENT);
+  delay(100);
   
   psi = psi_result(pressure_val);
   potin = potin_result(potin_val);
-  tmp = temp_result();
   current = current_result(current_val);
+  analogReference(INTERNAL2V56);
+  delay(200);
+  // take N samples in a row, with a slight delay
+  for (i=0; i< NUMSAMPLES; i++) {
+   samples[i] = analogRead(THERMISTORPIN);
+   delay(10);
+  }
+  analogReference(DEFAULT);
+ 
+  // average all the samples out
+  average = 0;
+  for (i=0; i< NUMSAMPLES; i++) {
+     average += samples[i];
+  }
+  average /= NUMSAMPLES;
+ 
+  // convert the value to resistance
+  average = 2.56 * 1023 / average - 1;
+  average = SERIESRESISTOR / average;
+ 
+  float steinhart;
+  steinhart = average / THERMISTORNOMINAL;     // (R/Ro)
+  steinhart = log(steinhart);                  // ln(R/Ro)
+  steinhart /= BCOEFFICIENT;                   // 1/B * ln(R/Ro)
+  steinhart += 1.0 / (TEMPERATURENOMINAL + 273.15); // + (1/To)
+  steinhart = 1.0 / steinhart;                 // Invert
+  steinhart -= 273.15;                         // convert to C  
   
-  sprintf(temp_buf, "Temp(A1): %d *C", tmp);
-  sprintf(potin_buf, "Pot.(A0): %d A", potin);
-  sprintf(press_buf, "Pressure(A2): %d PSI", psi);
-  sprintf(curr_buf, "Current(A3): %d A", current);
+  sprintf(temp_buf, "%d", steinhart); //*C
+  sprintf(potin_buf, "%d", potin); //A
+  sprintf(press_buf, "%d", psi); // psi
+  sprintf(curr_buf, "%d", current); //A
   
   check_pins_state();
-  //digitalPotWrite(0, potin_val/4);
-  //digitalPotWrite(0, 184);
-  if ((potin_val/4)<(57)) {digitalPotWrite(0, (potin_val/4));}
-  if ((potin_val/4)>(57)) { 
+  if ((potin_val/4)<60) {digitalPotWrite(0, (potin_val/4));}
+  if ((potin_val/4)>60) { 
    sw2_state = digitalRead(SW2);
    if (sw2_state == HIGH) {
-     if ((potin_val/4)>57) {digitalPotWrite(0, potin_val/4.65);} else {digitalPotWrite(0, potin_val/4);}
-   } else { digitalPotWrite(0, 57);}
+     if ((potin_val/4)>60) {digitalPotWrite(0, potin_val/5.58);} else {digitalPotWrite(0, potin_val/4);}
+   } else { digitalPotWrite(0, 60);}
    }
     
   
   LCD.firstPage();  
   do {
-    LCD.setFont(u8g_font_7x14);
-    LCD.drawStr(0, 0, temp_buf);
-    LCD.drawStr(0, 12, potin_buf);
-    LCD.drawStr(0, 24, press_buf);
-    LCD.drawStr(0, 38, curr_buf);
+    LCD.setFont(Bebasfont10x64);
+    if (potin<10) {LCD.drawStr(25, 64, potin_buf);} else {LCD.drawStr(0, 64, potin_buf);}
+    LCD.drawStr(50, 64, "A");
+    
+    //LCD.setFont(u8g_font_fur17);
+    LCD.setFont(Steelfish4x29);
+    LCD.drawStr(92, 19, temp_buf);
+    //LCD.setFont(u8g_font_helvR08);
+    LCD.drawStr(109, 19, "C");
+    
+    LCD.setFont(Steelfish4x29);
+    LCD.drawStr(84, 40, press_buf);
+    //LCD.setFont(u8g_font_helvR08);
+    LCD.drawStr(109, 40, "PSI");
+    
+    LCD.setFont(Steelfish4x29);
+    LCD.drawStr(84, 62, curr_buf);
+    //LCD.setFont(u8g_font_helvR08);
+    LCD.drawStr(109, 62, "A");
+    
+    LCD.setColorIndex(1);
+    LCD.drawCircle(107, 3, 1);
+    LCD.drawLine(77, 0, 77, 63);
+    LCD.drawLine(77, 21, 127, 21);
+    LCD.drawLine(77, 42, 127, 42);
   } while( LCD.nextPage() );
 }
 
