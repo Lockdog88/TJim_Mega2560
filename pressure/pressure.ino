@@ -142,7 +142,8 @@ void setup() {
   led_b=false;
   
   pinMode(sCS, OUTPUT);
-  SPI.begin(); 
+  SPI.begin();
+  Serial.begin(9600);
   
 
 }
@@ -152,23 +153,21 @@ void loop() {
   float average;
 
   potin_val = analogRead(POTIN);
-  delay(100);
+  delay(50);
   pressure_val = analogRead(PRESSURE);
-  delay(100);
+  delay(50);
   current_val = analogRead(CURRENT);
-  delay(100);
+  delay(50);
   
   psi = psi_result(pressure_val);
   potin = potin_result(potin_val);
   current = current_result(current_val);
-  analogReference(INTERNAL2V56);
-  delay(200);
+
   // take N samples in a row, with a slight delay
   for (i=0; i< NUMSAMPLES; i++) {
    samples[i] = analogRead(THERMISTORPIN);
    delay(10);
   }
-  analogReference(DEFAULT);
  
   // average all the samples out
   average = 0;
@@ -176,9 +175,8 @@ void loop() {
      average += samples[i];
   }
   average /= NUMSAMPLES;
- 
   // convert the value to resistance
-  average = 2.56 * 1023 / average - 1;
+  average = (1023 / average) -1;
   average = SERIESRESISTOR / average;
  
   float steinhart;
@@ -189,7 +187,7 @@ void loop() {
   steinhart = 1.0 / steinhart;                 // Invert
   steinhart -= 273.15;                         // convert to C  
   
-  sprintf(temp_buf, "%d", steinhart); //*C
+  sprintf(temp_buf, "%d", (int)steinhart); //*C
   sprintf(potin_buf, "%d", potin); //A
   sprintf(press_buf, "%d", psi); // psi
   sprintf(curr_buf, "%d", current); //A
@@ -203,7 +201,7 @@ void loop() {
    } else { digitalPotWrite(0, 60);}
    }
     
-  
+  Serial.println(temp_buf);
   LCD.firstPage();  
   do {
     LCD.setFont(Bebasfont10x64);
@@ -214,7 +212,7 @@ void loop() {
     LCD.setFont(Steelfish4x29);
     LCD.drawStr(92, 19, temp_buf);
     //LCD.setFont(u8g_font_helvR08);
-    LCD.drawStr(109, 19, "C");
+    LCD.drawStr(112, 19, "C");
     
     LCD.setFont(Steelfish4x29);
     LCD.drawStr(84, 40, press_buf);
@@ -227,7 +225,7 @@ void loop() {
     LCD.drawStr(109, 62, "A");
     
     LCD.setColorIndex(1);
-    LCD.drawCircle(107, 3, 1);
+    LCD.drawCircle(110, 3, 1);
     LCD.drawLine(77, 0, 77, 63);
     LCD.drawLine(77, 21, 127, 21);
     LCD.drawLine(77, 42, 127, 42);
