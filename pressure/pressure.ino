@@ -1,16 +1,37 @@
-
-#include "config.h"
+//#include <DallasTemperature.h>
+#include <OneWire.h>
+//#include "config.h"
 #include "U8glib.h"
-#include "SPI.h"
+
 
 #define E  3 //SCK
 #define RW 4 //MOSI
 #define RS 5 //CS
 
+
+#define POTIN    A0
+#define THERMISTORPIN     A7
+#define PRESSURE A2
+#define CURRENT  A6//A4
+
+#define LED1_B     10 // BLUE
+#define LED2_G      9 // GREEN
+
+#define SW1      11
+#define SW2      12
+#define SW3      49
+
+#define K1        7
+#define K2        6
+#define K3        8
+#define K5        31
+#define K6        52
+
+#define FANB 12
+#define FANF 44
+
 #define ON true
 #define OFF false
-
-#define sCS 53
 
 int temp_val, potin_val, pressure_val, current_val;
 int sw1_state, sw2_state, sw3_state;
@@ -24,8 +45,10 @@ U8GLIB_ST7920_128X64 LCD(E, RW, RS, U8G_PIN_NONE);
 
 int psi, tmp, potin, current;
 
-int samples[NUMSAMPLES];
+//int samples[NUMSAMPLES];
 
+OneWire ds(48);
+byte data[2];
 
 
 void check_pins_state(void) {
@@ -34,6 +57,7 @@ void check_pins_state(void) {
     digitalWrite(K1, HIGH);
     delay(8);
     digitalWrite(K5, HIGH);
+    //digitalWrite(K6, HIGH);
     sw3_state = digitalRead(SW3);
     if (sw3_state == LOW) {sw3 = false;}
     if ((k3_state==false)&&(sw3_state==HIGH)){
@@ -49,7 +73,7 @@ void check_pins_state(void) {
       k3_state = true;
       }
     }
-    sw2_state = digitalRead(SW2);
+    //sw2_state = digitalRead(SW2);
     if (sw2_state==HIGH) {
       digitalWrite(K3, LOW);
       digitalWrite(LED1_B, LOW);
@@ -84,6 +108,7 @@ void check_pins_state(void) {
       digitalWrite(K3, LOW);
       digitalWrite(LED1_B, LOW);
       digitalWrite(K5, LOW);
+      //digitalWrite(K6, LOW);
       k3_state = false;
       sw3 = false;
   }
@@ -103,16 +128,11 @@ int potin_result(int val) {
 
 int current_result(int val) {
   int temp;
-  temp = val*0.244;
+  //temp = val*0.244;
+  temp = ((val/205)*12.5);
   return temp;
 }
 
-void digitalPotWrite(int adr, int val) {
-  digitalWrite(sCS, LOW);
-  SPI.transfer(adr);
-  SPI.transfer(val);
-  digitalWrite(sCS, HIGH);
-}
 
 void setup() {
   //init LCD
@@ -125,15 +145,22 @@ void setup() {
   pinMode(K2, OUTPUT);
   pinMode(K3, OUTPUT);  
   pinMode(K5, OUTPUT); 
+  pinMode(K6, OUTPUT); 
   
   digitalWrite(K1, LOW);
   digitalWrite(K2, LOW);
   digitalWrite(K3, LOW);
   digitalWrite(K5, LOW);
+  digitalWrite(K6, LOW);
   
   pinMode(LED1_B, OUTPUT);
   pinMode(LED2_G, OUTPUT); 
  
+  pinMode(FANB, OUTPUT);
+  pinMode(FANF, OUTPUT); 
+  analogWrite(FANB, 0);
+  analogWrite(FANF, 0);
+   
   digitalWrite(LED1_B, LOW);
   digitalWrite(LED2_G, LOW);
   k3_state=false;
@@ -141,9 +168,12 @@ void setup() {
   led_g=false;
   led_b=false;
   
-  pinMode(sCS, OUTPUT);
-  SPI.begin();
-  Serial.begin(9600);
+    LCD.firstPage();  
+  do {
+    LCD.setFont(Bebasfont10x64);
+    LCD.drawStr(0, 64, "Orestherm");
+  } while( LCD.nextPage() );
+  delay(3000);
   
 
 }
@@ -151,57 +181,55 @@ void setup() {
 void loop() {
   uint8_t i;
   float average;
-
+  if (current>5) sw2_state=HIGH; else sw2_state=LOW; 
+  check_pins_state();
   potin_val = analogRead(POTIN);
   delay(50);
   pressure_val = analogRead(PRESSURE);
   delay(50);
   current_val = analogRead(CURRENT);
-  delay(50);
-  
+  //delay(50);
   psi = psi_result(pressure_val);
   potin = potin_result(potin_val);
   current = current_result(current_val);
-
-  // take N samples in a row, with a slight delay
-  for (i=0; i< NUMSAMPLES; i++) {
-   samples[i] = analogRead(THERMISTORPIN);
-   delay(10);
-  }
- 
-  // average all the samples out
-  average = 0;
-  for (i=0; i< NUMSAMPLES; i++) {
-     average += samples[i];
-  }
-  average /= NUMSAMPLES;
-  // convert the value to resistance
-  average = (1023 / average) -1;
-  average = SERIESRESISTOR / average;
- 
-  float steinhart;
-  steinhart = average / THERMISTORNOMINAL;     // (R/Ro)
-  steinhart = log(steinhart);                  // ln(R/Ro)
-  steinhart /= BCOEFFICIENT;                   // 1/B * ln(R/Ro)
-  steinhart += 1.0 / (TEMPERATURENOMINAL + 273.15); // + (1/To)
-  steinhart = 1.0 / steinhart;                 // Invert
-  steinhart -= 273.15;                         // convert to C  
+  if (current>5) sw2_state=HIGH; else sw2_state=LOW; 
+  check_pins_state();
+  ds.reset(); 
+  ds.write(0xCC);
+  ds.write(0x44);
+  delay(750);
   
-  sprintf(temp_buf, "%d", (int)steinhart); //*C
+  ds.reset();
+  ds.write(0xCC);
+  ds.write(0xBE);
+  data[0] = ds.read(); 
+  data[1] = ds.read();
+  int Temp = (data[1]<< 8)+data[0];
+  Temp = Temp>>4;
+  if (Temp<30)
+  {
+    analogWrite(FANB, (int)(255*0.20));
+    analogWrite(FANF, (int)(255*0.30)); 
+  } 
+  if ((Temp>30)&&(Temp<75)) analogWrite(FANB, (int)((255/100)*(Temp-10))); 
+  if ((Temp>30)&&(Temp<70)) analogWrite(FANF, (int)((255/100)*Temp));
+  if (Temp>75) analogWrite(FANB, 255);
+  if (Temp>70) analogWrite(FANF, 255);
+  
+  if (current>5) sw2_state=HIGH; else sw2_state=LOW; 
+  
+  sprintf(temp_buf, "%d", Temp); //*C
   sprintf(potin_buf, "%d", potin); //A
   sprintf(press_buf, "%d", psi); // psi
   sprintf(curr_buf, "%d", current); //A
-  
-  check_pins_state();
-  if ((potin_val/4)<60) {digitalPotWrite(0, (potin_val/4));}
-  if ((potin_val/4)>60) { 
-   sw2_state = digitalRead(SW2);
-   if (sw2_state == HIGH) {
-     if ((potin_val/4)>60) {digitalPotWrite(0, potin_val/5.58);} else {digitalPotWrite(0, potin_val/4);}
-   } else { digitalPotWrite(0, 60);}
-   }
+  if (current>5) sw2_state=HIGH; else sw2_state=LOW; 
+  check_pins_state(); 
+   sw1_state = digitalRead(SW1);
+   //if ((sw2_state == HIGH) || (sw1_state == HIGH)) {
+   //  if (potin_val>240) {digitalWrite(K6, HIGH);} else { digitalWrite(K6, LOW);}
+   //} 
     
-  Serial.println(temp_buf);
+ // Serial.println(temp_buf);
   LCD.firstPage();  
   do {
     LCD.setFont(Bebasfont10x64);

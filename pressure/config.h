@@ -12,7 +12,7 @@
 #define POTIN    A0
 #define THERMISTORPIN     A7
 #define PRESSURE A2
-#define CURRENT  A4
+#define CURRENT  A6//A4
 
 #define LED1_B     10 // BLUE
 #define LED2_G      9 // GREEN
@@ -25,4 +25,5 @@
 #define K2        6
 #define K3        8
 #define K5        31
+#define K6        52
 
